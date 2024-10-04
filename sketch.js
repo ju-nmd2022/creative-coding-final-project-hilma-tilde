@@ -1,14 +1,19 @@
 let video;
 let model;
 let predictions = [];
-let friend;
+let previousHandX = null;
+let frameSkip = 5;
+let responseText = "";
+let responseTimer = 0;
 
 function preload() {
   // Load any assets like images or sounds here
 }
 
 function setup() {
-  createCanvas(640, 480);
+  createCanvas(windowWidth, windowHeight);
+  frameRate(30);
+
   video = createCapture(VIDEO);
   video.size(640, 480);
   video.hide();
@@ -18,52 +23,73 @@ function setup() {
     model = lmodel;
   });
 
-  friend = new LittleFriend();
+  angleMode(DEGREES);
+  rectMode(CENTER);
 }
 
 function draw() {
-  background(200);
+  background(0);
+  noFill();
 
-  image(video, 0, 0);
+  // Little friend drawing
+  translate(width / 2, height / 2);
+  for (let i = 0; i < 200; i++) {
+    push();
+    rotate(sin(frameCount + i) * 100);
+    let r = map(i, 0, 200, 50, 255);
+    let g = map(i, 0, 200, 50, 255);
+    let b = map(i, 0, 200, 50, 255);
+    stroke(r, g, b);
+    rect(0, 0, 600 - i * 3, 600 - i * 3, 200 - i);
+    pop();
+  }
 
-  if (model) {
+  // Hand tracking with frame skipping for better performance
+  if (model && frameCount % frameSkip === 0) {
     model.detect(video.elt).then((preds) => {
       predictions = preds;
+      displayResponse(); // Moved here to ensure we check predictions each frame
     });
   }
-
-  friend.update(predictions);
-  friend.display();
 }
 
-class LittleFriend {
-  constructor() {
-    this.x = width / 2;
-    this.y = height / 2;
-    this.energy = 100;
-  }
+function displayResponse() {
+  if (predictions.length > 0) {
+    let hand = predictions[0].bbox;
+    let handX = hand[0] + hand[2] / 2;
 
-  update(predictions) {
-    if (predictions.length > 0) {
-      let hand = predictions[0].bbox;
-      this.x = hand[0] + hand[2] / 2;
-      this.y = hand[1] + hand[3] / 2;
-
-      // Random responses based on hand positions
-      if (hand[2] > 100) {
-        this.energy = random(50, 150);
+    // Check for waving gesture
+    if (previousHandX !== null) {
+      if (Math.abs(handX - previousHandX) > 30) {
+        console.log("Wave detected!");
+        responseText = getRandomResponse();
+        responseTimer = 60; // Reset the timer to 60 frames
       }
     }
+    previousHandX = handX;
   }
 
-  display() {
-    fill(255, 0, 0);
-    ellipse(this.x, this.y, 50, 50);
-    fill(0);
-    textSize(16);
+  // Display the response text if the timer is active
+  if (responseTimer > 0) {
+    fill(255);
+    textSize(32);
     textAlign(CENTER, CENTER);
-    text("Energy: " + this.energy.toFixed(2), this.x, this.y + 30);
+    text(responseText, width / 2, height / 2); // Centered text
+    responseTimer--; // Decrement the timer
   }
+}
+
+function getRandomResponse() {
+  const responses = [
+    "Hello!",
+    "Nice to see you!",
+    "Keep waving!",
+    "You are awesome!",
+    "Smile!",
+    "Stay creative!",
+    "Wave detected!",
+  ];
+  return random(responses);
 }
 
 // Configuration for handTrack
