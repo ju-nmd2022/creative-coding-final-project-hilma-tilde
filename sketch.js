@@ -2,13 +2,13 @@ let video;
 let model;
 let predictions = [];
 let previousHandX = null;
+let previousHandY = null;
 let frameSkip = 5;
 let responseText = "";
-let responseTimer = 0;
-
-function preload() {
-  // Load any assets like images or sounds here
-}
+let displayDuration = 80; // Frames to display the response
+let displayCounter = 0; // Counter for the response display duration
+let lastGestureTime = 0; // Frame count when the last gesture was detected
+let gestureCooldown = 90; // Cooldown period for gestures (in frames, approx. 3 seconds at 30 FPS)
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -21,6 +21,7 @@ function setup() {
   // Load the hand tracking model
   handTrack.load(handTrackConfig).then((lmodel) => {
     model = lmodel;
+    console.log("Model Loaded!");
   });
 
   angleMode(DEGREES);
@@ -48,48 +49,86 @@ function draw() {
   if (model && frameCount % frameSkip === 0) {
     model.detect(video.elt).then((preds) => {
       predictions = preds;
-      displayResponse(); // Moved here to ensure we check predictions each frame
+      detectGestures(); // Process the gestures
     });
   }
-}
 
-function displayResponse() {
-  if (predictions.length > 0) {
-    let hand = predictions[0].bbox;
-    let handX = hand[0] + hand[2] / 2;
-
-    // Check for waving gesture
-    if (previousHandX !== null) {
-      if (Math.abs(handX - previousHandX) > 30) {
-        console.log("Wave detected!");
-        responseText = getRandomResponse();
-        responseTimer = 60; // Reset the timer to 60 frames
-      }
-    }
-    previousHandX = handX;
-  }
-
-  // Display the response text if the timer is active
-  if (responseTimer > 0) {
+  // Display the response text if the counter is active
+  if (displayCounter > 0) {
     fill(255);
     textSize(32);
     textAlign(CENTER, CENTER);
-    text(responseText, width / 2, height / 2); // Centered text
-    responseTimer--; // Decrement the timer
+    text(responseText, width / 4, height / 4); // Centered text
+    displayCounter--; // Decrement the counter
   }
 }
 
-function getRandomResponse() {
-  const responses = [
-    "Hello!",
-    "Nice to see you!",
-    "Keep waving!",
-    "You are awesome!",
-    "Smile!",
-    "Stay creative!",
-    "Wave detected!",
-  ];
-  return random(responses);
+function detectGestures() {
+  if (predictions.length > 0) {
+    let hand = predictions[0].bbox;
+    let handX = hand[0] + hand[2] / 2;
+    let handY = hand[1] + hand[3] / 2;
+    let handWidth = hand[2];
+    let handHeight = hand[3];
+
+    // Check if the hand is within a reasonable vertical range for gestures
+    if (handY < height / 2) {
+      // Only consider gestures if the hand is in the upper half of the screen
+      // Check for waving gesture
+      if (previousHandX !== null && previousHandY !== null) {
+        // Ensure the hand moves significantly and stays within a certain vertical range
+        if (
+          Math.abs(handX - previousHandX) > 50 &&
+          Math.abs(handY - previousHandY) < 50
+        ) {
+          // Trigger the response only if enough time has passed since the last gesture
+          if (frameCount - lastGestureTime > gestureCooldown) {
+            console.log("Wave detected!");
+            responseText = getRandomResponse("wave");
+            displayCounter = displayDuration; // Reset the counter
+            lastGestureTime = frameCount; // Update last gesture time
+          }
+        }
+      }
+      previousHandX = handX;
+      previousHandY = handY;
+
+      // Check for fist gesture (simple heuristic: hand width is approximately equal to hand height)
+      if (Math.abs(handWidth - handHeight) < handWidth * 0.2) {
+        // Trigger the response only if enough time has passed since the last gesture
+        if (frameCount - lastGestureTime > gestureCooldown) {
+          console.log("Fist detected!");
+          responseText = getRandomResponse("fist");
+          displayCounter = displayDuration; // Reset the counter
+          lastGestureTime = frameCount; // Update last gesture time
+        }
+      }
+
+      // Check for open palm gesture (simple heuristic: hand width is greater than hand height)
+      if (handWidth > handHeight * 1.2) {
+        // Trigger the response only if enough time has passed since the last gesture
+        if (frameCount - lastGestureTime > gestureCooldown) {
+          console.log("Open palm detected!");
+          responseText = getRandomResponse("openPalm");
+          displayCounter = displayDuration; // Reset the counter
+          lastGestureTime = frameCount; // Update last gesture time
+        }
+      }
+    }
+  } else {
+    previousHandX = null;
+    previousHandY = null;
+  }
+}
+
+function getRandomResponse(gesture) {
+  const responses = {
+    wave: ["Hello!", "Nice to see you!", "Wave detected!"],
+    fist: ["Fist bump!", "Power up!", "Stay strong!"],
+    openPalm: ["High five!", "Palm detected!", "Great job!"],
+    // Add more gestures and responses as needed
+  };
+  return random(responses[gesture]);
 }
 
 // Configuration for handTrack
