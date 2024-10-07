@@ -4,11 +4,12 @@ let predictions = [];
 let previousHandX = null;
 let previousHandY = null;
 let frameSkip = 5;
-let responseText = "";
-let displayDuration = 80; // Frames to display the response
-let displayCounter = 0; // Counter for the response display duration
-let lastGestureTime = 0; // Frame count when the last gesture was detected
-let gestureCooldown = 90; // Cooldown period for gestures (in frames, approx. 3 seconds at 30 FPS)
+let displayDuration = 80;
+let displayCounter = 0;
+let lastGestureTime = 0;
+let gestureCooldown = 90;
+let currentVisual = null;
+let inStartingScreen = true;
 
 function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -29,37 +30,28 @@ function setup() {
 }
 
 function draw() {
-  background(0);
-  noFill();
+  background(255);
 
-  // Little friend drawing
-  translate(width / 2, height / 2);
-  for (let i = 0; i < 200; i++) {
-    push();
-    rotate(sin(frameCount + i) * 100);
-    let r = map(i, 0, 200, 50, 255);
-    let g = map(i, 0, 200, 50, 255);
-    let b = map(i, 0, 200, 50, 255);
-    stroke(r, g, b);
-    rect(0, 0, 600 - i * 3, 600 - i * 3, 200 - i);
-    pop();
-  }
+  if (inStartingScreen) {
+    drawLittleFriend(); // Show starting screen
+  } else {
+    if (model && frameCount % frameSkip === 0) {
+      model.detect(video.elt).then((preds) => {
+        predictions = preds;
+        console.log("Predictions:", predictions); // Log the predictions to see if anything is detected
+        detectGestures(); // Process gestures
+      });
+    }
 
-  // Hand tracking with frame skipping for better performance
-  if (model && frameCount % frameSkip === 0) {
-    model.detect(video.elt).then((preds) => {
-      predictions = preds;
-      detectGestures(); // Process the gestures
-    });
-  }
-
-  // Display the response text if the counter is active
-  if (displayCounter > 0) {
-    fill(255);
-    textSize(32);
-    textAlign(CENTER, CENTER);
-    text(responseText, width / 4, height / 4); // Centered text
-    displayCounter--; // Decrement the counter
+    // Show visual response if active
+    if (displayCounter > 0) {
+      if (currentVisual) {
+        displayVisual(currentVisual); // Display current visual
+      }
+      displayCounter--;
+    } else {
+      inStartingScreen = true; // Go back to starting screen
+    }
   }
 }
 
@@ -71,70 +63,167 @@ function detectGestures() {
     let handWidth = hand[2];
     let handHeight = hand[3];
 
-    // Check if the hand is within a reasonable vertical range for gestures
     if (handY < height / 2) {
-      // Only consider gestures if the hand is in the upper half of the screen
-      // Check for waving gesture
       if (previousHandX !== null && previousHandY !== null) {
-        // Ensure the hand moves significantly and stays within a certain vertical range
         if (
           Math.abs(handX - previousHandX) > 50 &&
           Math.abs(handY - previousHandY) < 50
         ) {
-          // Trigger the response only if enough time has passed since the last gesture
-          if (frameCount - lastGestureTime > gestureCooldown) {
-            console.log("Wave detected!");
-            responseText = getRandomResponse("wave");
-            displayCounter = displayDuration; // Reset the counter
-            lastGestureTime = frameCount; // Update last gesture time
-          }
+          triggerGesture("wave");
         }
       }
       previousHandX = handX;
       previousHandY = handY;
 
-      // Check for fist gesture (simple heuristic: hand width is approximately equal to hand height)
+      // Fist gesture
       if (Math.abs(handWidth - handHeight) < handWidth * 0.2) {
-        // Trigger the response only if enough time has passed since the last gesture
-        if (frameCount - lastGestureTime > gestureCooldown) {
-          console.log("Fist detected!");
-          responseText = getRandomResponse("fist");
-          displayCounter = displayDuration; // Reset the counter
-          lastGestureTime = frameCount; // Update last gesture time
-        }
+        triggerGesture("fist");
       }
 
-      // Check for open palm gesture (simple heuristic: hand width is greater than hand height)
+      // Open palm gesture
       if (handWidth > handHeight * 1.2) {
-        // Trigger the response only if enough time has passed since the last gesture
-        if (frameCount - lastGestureTime > gestureCooldown) {
-          console.log("Open palm detected!");
-          responseText = getRandomResponse("openPalm");
-          displayCounter = displayDuration; // Reset the counter
-          lastGestureTime = frameCount; // Update last gesture time
-        }
+        triggerGesture("openPalm");
       }
     }
   } else {
+    console.log("No hand detected.");
     previousHandX = null;
     previousHandY = null;
   }
 }
 
-function getRandomResponse(gesture) {
-  const responses = {
-    wave: ["Hello!", "Nice to see you!", "Wave detected!"],
-    fist: ["Fist bump!", "Power up!", "Stay strong!"],
-    openPalm: ["High five!", "Palm detected!", "Great job!"],
-    // Add more gestures and responses as needed
+function triggerGesture(gesture) {
+  console.log("Gesture detected:", gesture);
+  if (frameCount - lastGestureTime > gestureCooldown) {
+    currentVisual = getVisualResponse(gesture);
+    displayCounter = displayDuration;
+    lastGestureTime = frameCount;
+    inStartingScreen = false; // Exit starting screen
+    console.log("Gesture triggered:", gesture);
+  } else {
+    console.log("Gesture cooldown active.");
+  }
+}
+
+function getVisualResponse(gesture) {
+  const visuals = {
+    wave: "hearts",
+    fist: "explosion",
+    openPalm: "thumbsUp",
+    smile: "smile",
+    peace: "peaceSign",
+    angry: "angryFace",
+    clap: "clap",
+    blink: "blinky",
+    thumbsUp: "thumbsUp",
+    rockSign: "rockSign",
   };
-  return random(responses[gesture]);
+  return visuals[gesture];
+}
+
+function displayVisual(visual) {
+  switch (visual) {
+    case "hearts":
+      drawHearts();
+      break;
+    case "explosion":
+      drawExplosion();
+      break;
+    case "thumbsUp":
+      drawThumbsUp();
+      break;
+    case "smile":
+      drawSmile();
+      break;
+    case "peaceSign":
+      drawPeaceSign();
+      break;
+    case "angryFace":
+      drawAngryFace();
+      break;
+    case "clap":
+      drawClap();
+      break;
+    case "blinky":
+      drawBlinky();
+      break;
+    case "rockSign":
+      drawRockSign();
+      break;
+  }
+}
+
+function drawLittleFriend() {
+  noFill();
+  translate(width / 2, height / 2);
+  for (let i = 0; i < 200; i++) {
+    push();
+    rotate(sin(frameCount + i) * 100);
+    let r = map(i, 0, 200, 50, 255);
+    let g = map(i, 0, 200, 50, 255);
+    let b = map(i, 0, 200, 50, 255);
+    stroke(r, g, b);
+    rect(0, 0, 600 - i * 3, 600 - i * 3, 200 - i);
+    pop();
+  }
+}
+
+function drawHearts() {
+  fill(255, 0, 0);
+  for (let i = 0; i < 5; i++) {
+    let x = random(width);
+    let y = random(height);
+    textSize(48);
+    text("❤️", x, y);
+  }
+}
+
+function drawExplosion() {
+  fill(255, 150, 0);
+  for (let i = 0; i < 10; i++) {
+    ellipse(random(width), random(height), random(50, 150));
+  }
+}
+
+function drawThumbsUp() {
+  textSize(150);
+  text("👍", width / 2, height / 2);
+}
+
+function drawSmile() {
+  textSize(150);
+  text("😊", width / 2, height / 2);
+}
+
+function drawPeaceSign() {
+  textSize(150);
+  text("✌️", width / 2, height / 2);
+}
+
+function drawAngryFace() {
+  textSize(150);
+  text("😠", width / 2, height / 2);
+}
+
+function drawClap() {
+  textSize(150);
+  text("👏", width / 2, height / 2);
+}
+
+function drawBlinky() {
+  fill(0);
+  rect(width / 2, height / 2, width, height);
+}
+
+function drawRockSign() {
+  textSize(150);
+  text("🤘", width / 2, height / 2);
 }
 
 // Configuration for handTrack
 const handTrackConfig = {
-  flipHorizontal: true, // flip e.g for video
-  maxNumBoxes: 1, // maximum number of boxes to detect
-  iouThreshold: 0.5, // ioU threshold for non-max suppression
-  scoreThreshold: 0.6, // confidence threshold for predictions.
+  flipHorizontal: true,
+  maxNumBoxes: 1,
+  iouThreshold: 0.5,
+  scoreThreshold: 0.6,
 };
