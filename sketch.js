@@ -2,7 +2,15 @@ let video;
 let model;
 let predictions = [];
 let previousHandX = null;
-let isWaving = false; // Track if waving is detected
+let isWaving = false;
+let waveStartTime = 0;
+const waveDisplayDuration = 2000;
+const minWaveDuration = 500;
+const waveDeadband = 20;
+
+let waveCount = 0;
+let angryFaceDisplayTime = 3000;
+let angryFaceStartTime = null;
 
 function preload() {
   // Load any assets if needed
@@ -12,9 +20,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight);
   angleMode(DEGREES);
   rectMode(CENTER);
-  noLoop(); // Start with the starting screen only
 
-  // Setup the video capture
   video = createCapture(VIDEO);
   video.size(320, 240);
   video.hide();
@@ -23,7 +29,7 @@ function setup() {
   handTrack.load(handTrackConfig).then((lmodel) => {
     model = lmodel;
     console.log("Model Loaded!");
-    loop(); // Enable drawing once the model is loaded
+    loop();
   });
 
   frameRate(10);
@@ -33,11 +39,18 @@ function draw() {
   background(0);
   translate(width / 2, height / 2);
 
-  // Draw based on waving state
-  if (isWaving) {
-    drawSmilingFace(); // Draw smiling face when waving is detected
+  if (
+    angryFaceStartTime &&
+    millis() - angryFaceStartTime < angryFaceDisplayTime
+  ) {
+    drawAngryFace();
+  } else if (waveCount >= 10) {
+    angryFaceStartTime = millis();
+    waveCount = 0;
+  } else if (isWaving || millis() - waveStartTime < waveDisplayDuration) {
+    drawSmilingFace();
   } else {
-    drawStartingScreen(); // Draw starting screen otherwise
+    drawStartingScreen();
   }
 
   detectHand();
@@ -58,22 +71,42 @@ function drawStartingScreen() {
 }
 
 function drawSmilingFace() {
-  fill(255, 204, 0); // Yellow face
-  ellipse(0, 0, 200, 200); // Face
+  fill(255, 204, 0);
+  ellipse(0, 0, 200, 200);
 
-  fill(0); // Black for eyes
-  ellipse(-50, -30, 20, 20); // Left eye
-  ellipse(50, -30, 20, 20); // Right eye
+  fill(0);
+  ellipse(-40, -20, 25, 25);
+  ellipse(40, -20, 25, 25);
 
   noFill();
-  stroke(0); // Black for smile
+  stroke(0);
   strokeWeight(5);
-  arc(0, 15, 50, 25, 0, PI); // Smiling arc
+  arc(0, 20, 100, 50, 0, 170);
+}
+
+function drawAngryFace() {
+  fill(255, 204, 0);
+  ellipse(0, 0, 200, 200);
+
+  fill(0);
+  ellipse(-40, -20, 25, 25);
+  ellipse(40, -20, 25, 25);
+
+  noFill();
+  stroke(255, 0, 0);
+  strokeWeight(5);
+
+  line(-60, -40, -20, -20);
+  line(60, -40, 20, -20);
+
+  noFill();
+  stroke(0);
+  strokeWeight(5);
+  arc(0, 20, 100, 50, PI, 0);
 }
 
 function detectHand() {
-  if (model && frameCount % 10 === 0) {
-    // Detect every 5 frames
+  if (model) {
     model.detect(video.elt).then((preds) => {
       predictions = preds;
       checkWavingGesture();
@@ -83,15 +116,28 @@ function detectHand() {
 
 function checkWavingGesture() {
   if (predictions.length > 0) {
-    let handX = predictions[0].bbox[0] + predictions[0].bbox[2] / 2; // Get hand's center X position
+    let handX = predictions[0].bbox[0] + predictions[0].bbox[2] / 2;
 
     if (previousHandX !== null && Math.abs(handX - previousHandX) > 30) {
-      console.log("Wave detected!");
-      isWaving = true; // Set waving flag to true
+      if (Math.abs(handX - previousHandX) > waveDeadband) {
+        // Check if a wave has been detected for a minimum duration
+        if (!isWaving) {
+          console.log("Wave detected!");
+          isWaving = true;
+          waveStartTime = millis();
+          waveCount++;
+          console.log("Wave count: " + waveCount);
+        }
+      }
     } else {
-      isWaving = false; // No wave detected
+      // If the waving gesture has been detected for longer than the minimum duration, reset
+      if (isWaving && millis() - waveStartTime > minWaveDuration) {
+        isWaving = false;
+      }
     }
-    previousHandX = handX; // Update previous position
+    previousHandX = handX;
+  } else {
+    isWaving = false;
   }
 }
 
