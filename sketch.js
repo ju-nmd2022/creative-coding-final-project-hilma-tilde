@@ -25,11 +25,13 @@ function setup() {
   video.size(320, 240);
   video.hide();
 
-  // Load the hand tracking model
-  handTrack.load(handTrackConfig).then((lmodel) => {
-    model = lmodel;
-    console.log("Model Loaded!");
-    loop();
+  // Wait for the video to load before loading the model
+  video.elt.addEventListener("loadeddata", () => {
+    handTrack.load(handTrackConfig).then((lmodel) => {
+      model = lmodel;
+      console.log("Model Loaded!");
+      loop();
+    });
   });
 
   frameRate(10);
@@ -57,7 +59,7 @@ function draw() {
 }
 
 function drawStartingScreen() {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 200; i++) {
     push();
     rotate(sin(frameCount + i) * 100);
     stroke(
@@ -65,52 +67,56 @@ function drawStartingScreen() {
       map(sin(frameCount / 2), -1, 1, 50, 255),
       map(sin(frameCount / 4), -1, 1, 50, 255)
     );
-    rect(0, 0, 300 - i * 1.5, 300 - i * 1.5, 100 - i);
+    rect(0, 0, 600 - i * 3, 600 - i * 3, 200 - i);
     pop();
   }
 }
 
 function drawSmilingFace() {
-  fill(255, 204, 0);
-  ellipse(0, 0, 200, 200);
-
-  fill(0);
-  ellipse(-40, -20, 25, 25);
-  ellipse(40, -20, 25, 25);
+  push();
+  fill(255);
+  rect(-40, 0, 25, 45);
+  rect(40, 0, 25, 45);
 
   noFill();
-  stroke(0);
-  strokeWeight(5);
-  arc(0, 20, 100, 50, 0, 170);
+  stroke(255);
+  strokeWeight(20);
+  arc(15, 100, 500, 200, 0, 180);
+  pop();
 }
 
 function drawAngryFace() {
-  fill(255, 204, 0);
-  ellipse(0, 0, 200, 200);
-
-  fill(0);
-  ellipse(-40, -20, 25, 25);
-  ellipse(40, -20, 25, 25);
+  push();
+  fill(255);
+  rect(-40, -20, 25, 45);
+  rect(40, -20, 25, 45);
 
   noFill();
   stroke(255, 0, 0);
-  strokeWeight(5);
+  strokeWeight(20);
 
-  line(-60, -40, -20, -20);
-  line(60, -40, 20, -20);
+  line(-70, -40, -20, -30);
+  line(70, -40, 20, -30);
 
   noFill();
-  stroke(0);
-  strokeWeight(5);
-  arc(0, 20, 100, 50, PI, 0);
+  stroke(255);
+  strokeWeight(20);
+  arc(15, 150, 400, 100, 0, -180);
+  pop();
 }
 
 function detectHand() {
-  if (model) {
-    model.detect(video.elt).then((preds) => {
-      predictions = preds;
-      checkWavingGesture();
-    });
+  if (model && video.loadedmetadata) {
+    // Ensure video is ready
+    model
+      .detect(video.elt)
+      .then((preds) => {
+        predictions = preds;
+        checkWavingGesture();
+      })
+      .catch((err) => {
+        console.error("Error detecting hand: ", err);
+      });
   }
 }
 
