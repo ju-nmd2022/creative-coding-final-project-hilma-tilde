@@ -303,12 +303,6 @@ const explosionDuration = 2000; // Duration for heart explosion in milliseconds
 let thumbsUpDetectedTime = null; // Track the time when thumbs up is detected
 const minThumbsUpDuration = 500; // Minimum time for thumbs up to be considered valid
 
-// Lightning variables
-let lightning = [];
-let maxLightning = 10;
-let lightningInterval = 200;
-let fadeSpeed = 5;
-
 // Configuration for handTrack
 const handTrackConfig = {
   flipHorizontal: true, // Flip for video
@@ -316,6 +310,24 @@ const handTrackConfig = {
   iouThreshold: 0.5, // IoU threshold for non-max suppression
   scoreThreshold: 0.6, // Confidence threshold for predictions
 };
+
+// Randomized surprise elements
+let surpriseEvents = [
+  {
+    name: "colorChange",
+    probability: 0.05,
+    duration: 3000,
+    active: false,
+    startTime: null,
+  },
+  {
+    name: "randomShape",
+    probability: 0.03,
+    duration: 3000,
+    active: false,
+    startTime: null,
+  },
+];
 
 function preload() {
   // Load any assets if needed
@@ -347,6 +359,16 @@ function draw() {
   background(0);
   translate(width / 2, height / 2);
 
+  push();
+  fill(255);
+  textSize(60);
+  textAlign(CENTER, CENTER);
+  text("👋🏻 or 👍🏻", -720, -370);
+  pop();
+
+  // Handle surprise events
+  handleSurpriseEvents();
+
   if (
     angryFaceStartTime &&
     millis() - angryFaceStartTime < angryFaceDisplayTime
@@ -368,21 +390,6 @@ function draw() {
   // Reset explosion after duration
   if (explosionTriggered && millis() - explosionStartTime > explosionDuration) {
     explosionTriggered = false; // Reset explosion trigger
-  }
-
-  // Draw lightning flashes
-  for (let i = lightning.length - 1; i >= 0; i--) {
-    let bolt = lightning[i];
-    push();
-    stroke(255, 255, 0, bolt.alpha);
-    strokeWeight(4);
-    line(bolt.x1, bolt.y1, bolt.x2, bolt.y2);
-    pop();
-
-    bolt.alpha -= fadeSpeed;
-    if (bolt.alpha <= 0) {
-      lightning.splice(i, 1);
-    }
   }
 }
 
@@ -442,7 +449,6 @@ function detectHand() {
         predictions = preds;
         checkWavingGesture();
         checkThumbsUpGesture(); // Check for thumbs up gesture
-        checkHardRockGesture(); // Check for hard rock gesture
       })
       .catch((err) => {
         console.error("Error detecting hand: ", err);
@@ -462,6 +468,9 @@ function checkWavingGesture() {
           waveStartTime = millis();
           waveCount++;
           console.log("Wave count: " + waveCount);
+
+          // Trigger a surprise event with a certain probability
+          triggerSurpriseEvent();
         }
       }
     } else {
@@ -497,24 +506,6 @@ function checkThumbsUpGesture() {
     } else {
       thumbsUpDetectedTime = null;
       thumbsUpActive = false;
-    }
-  }
-}
-
-// Function to check for hard rock gesture
-function checkHardRockGesture() {
-  if (
-    predictions.length > 0 &&
-    predictions[0].score > handTrackConfig.scoreThreshold
-  ) {
-    let handY = predictions[0].bbox[1];
-    let handHeight = predictions[0].bbox[3];
-
-    // A simple condition to detect the hard rock gesture
-    // Here we assume the hard rock gesture is when the hand is above a certain y-coordinate and has a specific width-to-height ratio
-    if (handY < height / 2 && predictions[0].bbox[2] > handHeight * 0.6) {
-      console.log("Hard rock gesture detected!");
-      generateLightning(); // Trigger lightning effect
     }
   }
 }
@@ -602,14 +593,43 @@ class Heart {
   }
 }
 
-// Function to generate lightning effects
-function generateLightning() {
-  if (lightning.length < maxLightning) {
-    let x1 = random(-width / 2, width / 2);
-    let y1 = random(-height / 2, -height / 2 + 50);
-    let x2 = x1 + random(-50, 50);
-    let y2 = random(-height / 2 + 50, height / 2);
-    lightning.push({ x1, y1, x2, y2, alpha: 255 });
-    console.log("Lightning generated!");
-  }
+// Surprise event functions
+function handleSurpriseEvents() {
+  surpriseEvents.forEach((event) => {
+    if (event.active) {
+      if (millis() - event.startTime > event.duration) {
+        event.active = false;
+      } else {
+        // Handle the specific event behavior
+        if (event.name === "colorChange") {
+          changeBackgroundColor();
+        } else if (event.name === "randomShape") {
+          drawRandomShape();
+        }
+      }
+    }
+  });
+}
+
+function triggerSurpriseEvent() {
+  surpriseEvents.forEach((event) => {
+    if (random() < event.probability) {
+      event.active = true;
+      event.startTime = millis();
+      console.log(`${event.name} event triggered!`);
+    }
+  });
+}
+
+function changeBackgroundColor() {
+  background(random(255), random(255), random(255));
+}
+
+function drawRandomShape() {
+  push();
+  fill(random(255), random(255), random(255));
+  translate(random(-width / 2, width / 2), random(-height / 2, height / 2));
+  rotate(random(360));
+  rect(0, 0, random(50, 150), random(50, 150));
+  pop();
 }
