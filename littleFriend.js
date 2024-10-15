@@ -1,3 +1,4 @@
+// This code is from this video https://www.youtube.com/watch?v=ktPnruyC6cc
 function setup() {
 createCanvas(windowWidth, windowHeight);
 
